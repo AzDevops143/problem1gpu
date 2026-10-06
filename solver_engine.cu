@@ -19,7 +19,6 @@
 
 __device__ float g_maxdiff;
 
-// --- Device Helper: Warp Shuffle Reduction ---
 __device__ inline float warpReduceMax(float val) {
     for (int offset = 16; offset > 0; offset /= 2) {
         val = fmaxf(val, __shfl_down_sync(FULL_MASK, val, offset));
@@ -27,7 +26,6 @@ __device__ inline float warpReduceMax(float val) {
     return val;
 }
 
-// --- 1. Baseline: Global Memory Kernel (Evaluated Every Iteration) ---
 __global__ void heatKernelGlobal(const float* __restrict__ T, float* __restrict__ Tnew, int N, bool checkDiff)
 {
     extern __shared__ float sdata[];
@@ -59,7 +57,6 @@ __global__ void heatKernelGlobal(const float* __restrict__ T, float* __restrict_
     }
 }
 
-// --- 2. Baseline: Shared Memory Tiled Kernel (Halo Padded) ---
 __global__ void heatKernelShared(const float* __restrict__ T, float* __restrict__ Tnew, int N, bool checkDiff)
 {
     extern __shared__ float smemAll[];
@@ -105,7 +102,6 @@ __global__ void heatKernelShared(const float* __restrict__ T, float* __restrict_
     }
 }
 
-// --- 3. Optimized: Warp-Shuffle Accelerated Kernel with Periodic Checks ---
 __global__ void heatKernelOptimized(const float* __restrict__ T, float* __restrict__ Tnew, int N, bool checkDiff)
 {
     int col = blockIdx.x * blockDim.x + threadIdx.x + 1;
@@ -140,7 +136,6 @@ __global__ void heatKernelOptimized(const float* __restrict__ T, float* __restri
     }
 }
 
-// --- 4. Algorithmic Leap: Red-Black Gauss-Seidel (RB-GS) SOR Kernel ---
 __global__ void heatKernelRBSOR(float* __restrict__ T, int N, float omega, int color, bool checkDiff)
 {
     int col = blockIdx.x * blockDim.x + threadIdx.x + 1;
@@ -231,16 +226,16 @@ RunStats executeSolver(int N, float tol, long long maxIter, int solverType, int 
         bool check = ((iter + 1) % checkInterval == 0) || (iter == 0);
         if (check) CUDA_CHECK(cudaMemcpyToSymbol(g_maxdiff, &zero, sizeof(float)));
 
-        if (solverType == 0) { // Baseline Global
+        if (solverType == 0) {
             heatKernelGlobal<<<grid, block, sharedBytesGlobal>>>(dA, dB, N, check);
             std::swap(dA, dB);
-        } else if (solverType == 1) { // Baseline Shared
+        } else if (solverType == 1) {
             heatKernelShared<<<grid, block, sharedBytesShared>>>(dA, dB, N, check);
             std::swap(dA, dB);
-        } else if (solverType == 2) { // Optimized Shuffle + Batched
+        } else if (solverType == 2) {
             heatKernelOptimized<<<grid, block>>>(dA, dB, N, check);
             std::swap(dA, dB);
-        } else if (solverType == 3) { // Red-Black Gauss-Seidel SOR
+        } else if (solverType == 3) {
             heatKernelRBSOR<<<grid, block>>>(dA, N, omega, 0, check);
             heatKernelRBSOR<<<grid, block>>>(dA, N, omega, 1, check);
         }
@@ -249,7 +244,7 @@ RunStats executeSolver(int N, float tol, long long maxIter, int solverType, int 
             CUDA_CHECK(cudaMemcpyFromSymbol(&currentDiff, g_maxdiff, sizeof(float)));
             if (isnan(currentDiff) || isinf(currentDiff)) {
                 currentDiff = 1e30f;
-                break; // Divergence detected
+                break;
             }
         }
         iter++;

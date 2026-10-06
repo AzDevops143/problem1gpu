@@ -83,15 +83,9 @@ This project implements and benchmarks multiple CUDA GPU execution strategies:
 ## 6. Build and Execution
 
 ```bash
-# Compile with NVCC (optimized -O3)
 nvcc -O3 -arch=sm_75 solver_engine.cu -o solver_engine
 
-# Run solver: ./solver_engine <N> <solver_type> <check_interval> <omega>
-# Solver Types: 0 = Global, 1 = Shared Tiled, 2 = Warp-Shuffle, 3 = RB-GS SOR
-
-# Example 1: Shared Memory Tiled on N=512
 ./solver_engine 512 1 1 1.0
 
-# Example 2: Red-Black SOR with optimal omega on N=1024
 ./solver_engine 1024 3 64 1.99388
 ```
